@@ -1,0 +1,73 @@
+// project-tool/server.js
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+let users = [];
+let projects = [];
+let tasks = [];
+let comments = [];
+
+let nextUserId = 1;
+let nextProjectId = 1;
+let nextTaskId = 1;
+let nextCommentId = 1;
+
+// user
+app.post('/api/users', (req, res) => {
+  const { name } = req.body;
+  const user = { id: nextUserId++, name };
+  users.push(user);
+  res.status(201).json(user);
+});
+
+// create project
+app.post('/api/projects', (req, res) => {
+  const { name, ownerId } = req.body;
+  const project = { id: nextProjectId++, name, ownerId };
+  projects.push(project);
+  res.status(201).json(project);
+});
+
+// create task in project
+app.post('/api/projects/:projectId/tasks', (req, res) => {
+  const projectId = Number(req.params.projectId);
+  const { title, assigneeId } = req.body;
+  const task = { id: nextTaskId++, projectId, title, assigneeId, status: 'TODO' };
+  tasks.push(task);
+  res.status(201).json(task);
+});
+
+// list tasks in project
+app.get('/api/projects/:projectId/tasks', (req, res) => {
+  const projectId = Number(req.params.projectId);
+  res.json(tasks.filter(t => t.projectId === projectId));
+});
+
+// update task (status / title / assignee)
+app.patch('/api/tasks/:id', (req, res) => {
+  const t = tasks.find(x => x.id === Number(req.params.id));
+  if (!t) return res.status(404).json({ error: 'Task not found' });
+  const { title, assigneeId, status } = req.body;
+  if (title) t.title = title;
+  if (assigneeId) t.assigneeId = assigneeId;
+  if (status) t.status = status;
+  res.json(t);
+});
+
+// comment on task (communicate within task)
+app.post('/api/tasks/:id/comments', (req, res) => {
+  const taskId = Number(req.params.id);
+  const { userId, text } = req.body;
+  const c = { id: nextCommentId++, taskId, userId, text, createdAt: new Date().toISOString() };
+  comments.push(c);
+  res.status(201).json(c);
+});
+
+// view comments of a task
+app.get('/api/tasks/:id/comments', (req, res) => {
+  const taskId = Number(req.params.id);
+  res.json(comments.filter(c => c.taskId === taskId));
+});
+
+app.listen(4002, () => console.log('Project Tool API on 4002'));
