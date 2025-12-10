@@ -1,0 +1,88 @@
+// ecommerce/server.js
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+let products = [
+  { id: 1, name: 'Phone', price: 500 },
+  { id: 2, name: 'Laptop', price: 1000 },
+  { id: 3, name: 'Headphones', price: 100 }
+];
+
+let users = [];
+let carts = {};       // userId -> [{productId, qty}]
+let orders = [];
+let nextUserId = 1;
+let nextOrderId = 1;
+
+// register / login (very simple, no passwords)
+app.post('/api/register', (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const user = { id: nextUserId++, name };
+  users.push(user);
+  carts[user.id] = [];
+  res.status(201).json(user);
+});
+
+// list products
+app.get('/api/products', (req, res) => res.json(products));
+
+// product details
+app.get('/api/products/:id', (req, res) => {
+  const p = products.find(x => x.id === Number(req.params.id));
+  if (!p) return res.status(404).json({ error: 'Not found' });
+  res.json(p);
+});
+
+// add to cart
+app.post('/api/users/:userId/cart', (req, res) => {
+  const userId = Number(req.params.userId);
+  const { productId, qty } = req.body;
+  if (!carts[userId]) return res.status(404).json({ error: 'User/cart not found' });
+
+  const product = products.find(p => p.id === productId);
+  if (!product) return res.status(400).json({ error: 'Invalid product' });
+
+  const cart = carts[userId];
+  const existing = cart.find(i => i.productId === productId);
+  if (existing) existing.qty += qty;
+  else cart.push({ productId, qty });
+
+  res.json(cart);
+});
+
+// view cart
+app.get('/api/users/:userId/cart', (req, res) => {
+  const userId = Number(req.params.userId);
+  res.json(carts[userId] || []);
+});
+
+// place order (order processing)
+app.post('/api/users/:userId/checkout', (req, res) => {
+  const userId = Number(req.params.userId);
+  const cart = carts[userId];
+  if (!cart || cart.length === 0) {
+    return res.status(400).json({ error: 'Cart empty' });
+  }
+  let total = 0;
+  const items = cart.map(c => {
+    const p = products.find(x => x.id === c.productId);
+    const lineTotal = p.price * c.qty;
+    total += lineTotal;
+    return { productId: p.id, name: p.name, qty: c.qty, lineTotal };
+  });
+
+  const order = { id: nextOrderId++, userId, items, total, status: 'PLACED' };
+  orders.push(order);
+  carts[userId] = []; // clear cart
+  res.status(201).json(order);
+});
+
+// view orders
+app.get('/api/users/:userId/orders', (req, res) => {
+  const userId = Number(req.params.userId);
+  res.json(orders.filter(o => o.userId === userId));
+});
+
+app.listen(4000, () => console.log('E‑commerce API on 4000'));
