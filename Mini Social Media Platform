@@ -1,0 +1,54 @@
+// social-media/server.js
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+let users = [];
+let posts = [];
+let likes = []; // {userId, postId}
+let nextUserId = 1;
+let nextPostId = 1;
+
+// create user profile
+app.post('/api/users', (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const user = { id: nextUserId++, name };
+  users.push(user);
+  res.status(201).json(user);
+});
+
+// create post
+app.post('/api/posts', (req, res) => {
+  const { userId, content } = req.body;
+  if (!userId || !content) return res.status(400).json({ error: 'userId & content required' });
+  const post = { id: nextPostId++, userId, content, createdAt: new Date().toISOString() };
+  posts.push(post);
+  res.status(201).json(post);
+});
+
+// list posts (with like count)
+app.get('/api/posts', (req, res) => {
+  const result = posts.map(p => ({
+    ...p,
+    likes: likes.filter(l => l.postId === p.id).length
+  }));
+  res.json(result);
+});
+
+// like / unlike
+app.post('/api/posts/:id/like', (req, res) => {
+  const postId = Number(req.params.id);
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+
+  const existing = likes.find(l => l.userId === userId && l.postId === postId);
+  if (existing) {
+    likes = likes.filter(l => !(l.userId === userId && l.postId === postId)); // unlike
+  } else {
+    likes.push({ userId, postId });
+  }
+  res.json({ likes: likes.filter(l => l.postId === postId).length });
+});
+
+app.listen(4001, () => console.log('Social Media API on 4001'));
